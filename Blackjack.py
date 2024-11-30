@@ -33,12 +33,21 @@ class Box:
         self.addedten = False
         
 class Player: 
-    def __init__(self, name): 
-        self.name = name 
+    def __init__(self): 
+        self.name = "" 
         self.balance = 0 
         self.boxespositions = []
         self.numofboxes = 0 
         self.boxes = [] 
+    
+    @classmethod
+    def take_player_name(cls):
+        name = input("Enter your name please: ")
+
+        while not name.isalpha():
+            name = input("Invalid input! Please enter your name again: ")
+
+        return name
         
     @classmethod 
     def take_player_balance(cls): 
@@ -50,13 +59,11 @@ class Player:
         return int(balance) 
         
     @classmethod 
-    def take_player_wager(cls, self): 
-        wager = input(f"Choose how much you want to wager in your box, ranging from 10 to 10 000 inclusive: ") 
+    def take_player_wager(cls, self, balance):
+        wager = input(f"Choose how much you want to wager in your box, ranging from 10 to {balance} inclusive: ") 
         
-        while (not wager.isdigit()) or (not int(wager) in range(10, 10001) or (int(wager) > self.balance)): 
-            wager = input("Incorrect input! Please try again: ") 
-            
-        self.balance -= int(wager) 
+        while (not wager.isdigit()) or (not int(wager) in range(10, balance + 1) or (int(wager) > balance)): 
+            wager = input("Incorrect input! Please try again: ")  
         
         return int(wager) 
         
@@ -71,7 +78,7 @@ class Dealer:
         self.insurance = False 
         
     def __str__(self): 
-        return f"My name is {self.name} and I will be your dealer in the next games!" 
+        return f"My name is {self.name} and I will be your dealer for the next game!" 
 
 class Game: 
     freeboxes = [1, 2, 3, 4, 5, 6, 7] 
@@ -87,7 +94,7 @@ class Game:
     def __init__(self): 
         self.deck = Deck.create_deck() 
         random.shuffle(self.deck)  
-        self.player = Player("Bella") 
+        self.player = Player() 
         self.dealer = Dealer()
         
     def deal_player_first_card_per_box(self, boxposition): 
@@ -112,7 +119,8 @@ class Game:
 
             freeboxes.remove(boxposition)
         
-            wager = Player.take_player_wager(self.player) 
+            wager = Player.take_player_wager(self.player, self.player.balance)
+            self.player.balance -= wager 
             cards = Game.deal_player_first_card_per_box(self, boxposition)
             self.player.boxes.append(Box(boxposition,wager,cards)) 
             
@@ -284,6 +292,9 @@ class Game:
     @classmethod 
     def play(cls,self):
         '''Create all the boxes and give one card to all of them.'''
+        self.player.name = Player.take_player_name()
+        print(f"Hello {self.player.name}! Let's start playing!")
+        print(self.dealer)
         self.player.balance = Player.take_player_balance()
         self.player.numofboxes = Game.pick_num_of_boxes()
         self.player.boxes = Game.pick_player_box(self, Game.freeboxes, self.player.numofboxes)
@@ -431,7 +442,7 @@ class Game:
                             break
                     '''stay'''        
                 elif int(decision) == 2: 
-                    print(f"You have chosed to stay with result of {box.result}.")
+                    print(f"You have chosen to stay with result of {box.result}.")
                     '''surrender'''
                 else:  
                     print(f"Your result is {box.result}.") 
@@ -464,7 +475,7 @@ class Game:
 
                                 if box.result > 21:
                                     box.busted = True
-                                    print(f"Your result is {box.result}. You are busted and lose this game and all the money you have wagered! Go and cry :D!")
+                                    print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
                                     break
 
                                 decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
@@ -567,10 +578,10 @@ class Game:
                             break
                     elif box.result > 21 and box.addedten == False:
                         box.busted = True
-                        print(f"Your result is {box.result}. You are busted and lose this game and all the money you have wagered! Go and cry :D!")
+                        print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
                     '''stay'''        
                 elif int(decision) == 2: 
-                    print(f"You have chosed to stay with result of {box.result}.")
+                    print(f"You have chosen to stay with result of {box.result}.")
                     '''surrender'''
                 else: 
                     Game.surrender(self, box)
