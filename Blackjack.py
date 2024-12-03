@@ -16,7 +16,8 @@ class Card:
 class Deck: 
     @classmethod 
     def create_deck(cls): 
-        return [Card(rank, suite) for rank in ranks for suite in suites] 
+        return  6 * [Card(rank, suite) for rank in ranks for suite in suites]
+    
         
 class Box: 
     def __init__(self, position, wager, cards): 
