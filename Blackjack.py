@@ -14,11 +14,13 @@ class Card:
         return f"{self.rank} of {self.suite}" 
 
 class Deck: 
-    @classmethod 
-    def create_deck(cls): 
-        return  6 * [Card(rank, suite) for rank in ranks for suite in suites]
+    def __init__(self):
+        self.cards = 6 * [Card(rank, suite) for rank in ranks for suite in suites]
+        random.shuffle(self.cards)
     
-        
+    def draw_card(self):
+        return self.cards.pop()
+    
 class Box: 
     def __init__(self, position, wager, cards): 
         self.position = position 
@@ -37,36 +39,42 @@ class Player:
     def __init__(self): 
         self.name = "" 
         self.balance = 0 
-        self.boxespositions = []
-        self.numofboxes = 0 
-        self.boxes = [] 
+        self.boxes = []
+
+# this method handles all the situations when the player is asked to enter their balance(between 10 an 1000), or m=ti make a decision 
+# whether they would like to hit again or no
+    def take_input(self, prompt, valid_range=None, is_digit =True):
+        while True:
+            value = input(prompt)
+            if is_digit and value.isdigit():
+                value = int(value)
+                if valid_range and value in valid_range:
+                    return value
+            elif not is_digit and value.isalpha():
+                return value
+            print("Invalid input. Please try again.")
     
-    @classmethod
-    def take_player_name(cls):
-        name = input("Enter your name please: ")
+    def choose_yes_or_no(self, prompt, values, is_digit = True):
+        value = input(prompt)
 
-        while not name.isalpha():
-            name = input("Invalid input! Please enter your name again: ")
-
-        return name
+        while True:
+            if is_digit and value.isdigit():
+                value = int(value)
+                if value in values:
+                    return value
+            elif not is_digit and value.isalpha():
+                if value in values:
+                    return value
+            value = input(f'Invalid input. Please try again. Enter either {values[0]} or {values[1]}: ')
+    
+    def take_player_name(self):
+        return self.take_input("Enter your name: ", is_digit=False)
         
-    @classmethod 
-    def take_player_balance(cls): 
-        balance = input("Enter your balance, ranging from 1 to 100 000 inclusive: ") 
+    def take_player_balance(self): 
+        return self.take_input("Enter your balance (1-100000): ", range(5, 100001)) 
         
-        while (not balance.isdigit()) or (not int(balance) in range(5, 100001)): 
-            balance = input("Enter your balance, ranging from 1 to 100 000 inclusive: ") 
-            
-        return int(balance) 
-        
-    @classmethod 
-    def take_player_wager(cls, self, balance):
-        wager = input(f"Choose how much you want to wager in your box, ranging from 10 to {balance} inclusive: ") 
-        
-        while (not wager.isdigit()) or (not int(wager) in range(10, balance + 1) or (int(wager) > balance)): 
-            wager = input("Incorrect input! Please try again: ")  
-        
-        return int(wager) 
+    def take_player_wager(self):
+       return self.take_input(f"Enter your wager (10-{self.balance}): ", range(10, self.balance + 1))
         
     def __str__(self): 
         return f"My name is {self.name} and I have {self.balance} balance." 
@@ -82,76 +90,62 @@ class Dealer:
         return f"My name is {self.name} and I will be your dealer for the next game!" 
 
 class Game: 
-    freeboxes = [1, 2, 3, 4, 5, 6, 7] 
+    freeboxes = [1, 2, 3, 4, 5, 6, 7]
     
-    def pick_num_of_boxes(): 
-        num = input("Choose how many boxes you want to play with, ranging from 1 to 7, inclusive: ") 
-        
-        while (not num.isdigit()) or (not int(num) in range(1, 8)): 
-            num = input("Incorrect input. Please try again: ") 
-        
-        return int(num) 
+    def pick_num_of_boxes(self):
+        return Player.take_input(self.player,'Choose how many boxes you want to play with, ranging from 1 to 7, inclusive: ', range(1,8), is_digit=True)
         
     def __init__(self): 
-        self.deck = Deck.create_deck() 
-        random.shuffle(self.deck)  
+        self.deck = Deck()  
         self.player = Player() 
         self.dealer = Dealer()
         
     def deal_player_first_card_per_box(self, boxposition): 
         cards = [] 
-        card = self.deck.pop() 
+        card = self.deck.draw_card() 
         print(f"The first card for box number {boxposition} is {Card.__str__(card)}") 
         cards.append(card.value) 
         
         return cards 
         
-    def pick_player_box(self, freeboxes, numofboxes): 
-        for box in range(0, numofboxes): 
-            chosedboxpos = input(f"The free boxes you can choose from are at positions {freeboxes}. Choose your preferred one: ") 
-            
-            while (not chosedboxpos.isdigit()) or (not int(chosedboxpos) in range(1, 8)): 
-                chosedboxpos = input("Invalid input! Please try again: ") 
-        
-            boxposition = int(chosedboxpos)
+    def pick_player_box(self, freeboxes, numofboxes):
+        for box in range(1, numofboxes + 1):
+            boxposition = Player.take_input(self.player, f"The free boxes you can choose from are at positions {freeboxes}. Choose your preferred one: ", range(1, 8), is_digit=True)
 
             while not boxposition in freeboxes:
-                boxposition = input("Invalid input! This box had been chosed already. Choose a new one:  ")
+                boxposition = input("Invalid input! This box had been chosen already. Choose a new one:  ")
 
             freeboxes.remove(boxposition)
-        
-            wager = Player.take_player_wager(self.player, self.player.balance)
+
+            wager = Player.take_player_wager(self.player)
             self.player.balance -= wager 
-            cards = Game.deal_player_first_card_per_box(self, boxposition)
+            cards = self.deal_player_first_card_per_box(boxposition)
             self.player.boxes.append(Box(boxposition,wager,cards)) 
             
         return self.player.boxes
             
     def deal_dealer_first_card(self): 
-        card = self.deck.pop() 
+        card = self.deck.draw_card()
         self.dealer.cards.append(card.value)
         self.dealer.result += card.value
 
         print(f"The first card for the dealer is {Card.__str__(card)}")
         
         if card.value == 1: 
-            self.dealer.insurance = True 
+            self.dealer.insurance = True
             for box in self.player.boxes:
-                playerchoice = input("It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ") 
-                
-                while (not playerchoice.isalpha()) or (not playerchoice == "Y") and (not playerchoice == "N"): 
-                    playerchoice = input("Wrong input. Please try again. If you want to make an insurance enter Y otherwise enter N: ") 
-                    
+                playerchoice = Player.choose_yes_or_no(self.player, "It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ")
+
                 if playerchoice == "Y": 
                     box.wager += box.wager / 2 
                     box.insurance = True 
                     print("You just made an insurance. If the dealer has a blackjack, you will lose your original wager but the insurance bet will be paid 2 to 1.") 
                 else:
-                    print("You have just chosed to not insure your bets.")
+                    print("You have just chosen not to insure your bets.")
         return self.dealer.cards 
             
     def deal_player_second_card_per_box(self, cards, boxposition): 
-        card = self.deck.pop()
+        card = self.deck.draw_card()
         cards.append(card.value) 
         print(f"The second card for box number {boxposition} is {Card.__str__(card)}.") 
         return cards 
@@ -165,7 +159,7 @@ class Game:
 
         if dealmorecards == True:
             self.dealer.result = sum(self.dealer.cards)
-            card = self.deck.pop()
+            card = self.deck.draw_card() 
             self.dealer.cards.append(card.value)
             self.dealer.result += card.value
             print(f"The new card the dealer has just drawn is {Card.__str__(card)} and the dealer's result till now is {self.dealer.result}.")
@@ -182,7 +176,7 @@ class Game:
                         print(f"Insurance win! Unfortunately you loose all your wager. Your profit is 0.")
 
             while self.dealer.result < 17:
-                card = self.deck.pop()
+                card = self.deck.draw_card() 
                 self.dealer.result += card.value
                 self.dealer.cards.append(card.value)
 
@@ -208,7 +202,7 @@ class Game:
         print("The game has just ended!")
 
     def hit(self, cards): 
-        card = self.deck.pop()
+        card = self.deck.draw_card() 
         cards.append(card.value)
         print(f"The new card you just drawn is {Card.__str__(card)}.") 
         
@@ -220,9 +214,9 @@ class Game:
         print(f"Your result is {box.result}. You chosed to surrender, therefore the game has ended for you and your profit is {box.profit}")        
     
     def double_down(self, box): 
-        card = self.deck.pop() 
+        card = self.deck.draw_card() 
         box.cards.append(card.value)
-        print(f"The card you just dranw is {Card.__str__(card)}.") 
+        print(f"The card you have just drawn is {Card.__str__(card)}.") 
         box.result += card.value 
         box.wager += box.wager 
         
@@ -250,8 +244,8 @@ class Game:
         
         box.splitted = True
         
-        regboxsecondcard = self.deck.pop() 
-        extraboxsecondcard = self.deck.pop() 
+        regboxsecondcard = self.deck.draw_card() 
+        extraboxsecondcard = self.deck.draw_card() 
         
         box.cards.append(regboxsecondcard.value) 
         extrabox.cards.append(extraboxsecondcard.value)
@@ -290,15 +284,14 @@ class Game:
                         break
                     break
                                 
-    @classmethod 
-    def play(cls,self):
+    def play(self):
         '''Create all the boxes and give one card to all of them.'''
-        self.player.name = Player.take_player_name()
+        self.player.name = Player.take_player_name(self.player)
         print(f"Hello {self.player.name}! Let's start playing!")
         print(self.dealer)
-        self.player.balance = Player.take_player_balance()
-        self.player.numofboxes = Game.pick_num_of_boxes()
-        self.player.boxes = Game.pick_player_box(self, Game.freeboxes, self.player.numofboxes)
+        self.player.balance = Player.take_player_balance(self.player)
+        numofboxes = self.pick_num_of_boxes()
+        self.player.boxes = Game.pick_player_box(self, Game.freeboxes, numofboxes)
         
         '''Give first card to the dealer and check for insurance''' 
         self.dealer.cards = Game.deal_dealer_first_card(self) 
@@ -306,7 +299,7 @@ class Game:
         '''Give a second card to all the boxes.''' 
         for box in self.player.boxes: 
             box.cards = Game.deal_player_second_card_per_box(self, box.cards, box.position)
-            print(f"All the player's box cards are {box.cards}")
+            print(f"All the player's cards for box at position {box.position} are {box.cards}")
             box.result = sum(box.cards)
             
             
@@ -328,12 +321,9 @@ class Game:
                 return
                 '''double down'''
             elif box.result == 9 or box.result == 10 or box.result == 11:
-                decision = input("Card or double. Double is only one card. Insert 1 if you want a card, otherwise insert 2: ")
-
-                while (not decision.isdigit()) or (not int(decision) in range(1, 3)):
-                    decision = input("Invalid input! Please insert either 1 or 2: ")
+                decision = Player.choose_yes_or_no(self.player, "Card or double. Double is only one card. Insert 1 if you want a card, otherwise insert 2: ", [1,2], is_digit=True)
                 
-                if int(decision) == 1:
+                if decision == 1:
                     newdecision = "Y"
                     while box.result < 21 and newdecision == "Y":
                         box.cards = Game.hit(self, box.cards)
@@ -353,27 +343,22 @@ class Game:
                             box.result += 10
                             box.addedten = True
                             print(f"Your result is {box.result}.")
+
+                        newdecision = Player.choose_yes_or_no(self.player, 'Would you like to hit again. If yes insert "Y" otherwise insert "N": ', ['Y', 'N'], is_digit=False)
                         
-                        newdecision = input('Would you like to hit again. If yes insert "Y" otherwise insert "N": ')
+                        if newdecision == "N":
+                            print(f"Your result is {box.result}.")
 
-                        while (not newdecision.isalpha()) or (not newdecision == "Y") and (not newdecision == "N"): 
-                            newdecision = input("Invalid input! Please enter either Y or N: ")
-                    
-                    if newdecision == "N":
-                        print(f"Your result is {box.result}.")
-
-                elif int(decision) == 2:
+                elif decision == 2:
                     Game.double_down(self, box)
                 '''1 or 11'''
             elif 1 in box.cards and box.result <= 11: 
                 box.result += 10
                 box.addedten = True
                 print(f"Your result is {box.result}.") 
-                
-                decision = input("You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is " 
-                                 + "to surrender. Please enter the number of your preferred one: ") 
-                while (not decision.isdigit()) or (not int(decision) in range (1, 4)): 
-                    decision = input("Invalid input! Please enter a number between 1 and 3 inclusive: ") 
+
+                decision = Player.take_input(self.player, "You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is " 
+                                 + "to surrender. Please enter the number of your preferred one: ", range(1, 4), is_digit=True)
 
                 if int(decision) == 1: 
                     box.cards = Game.hit(self, box.cards) 
@@ -381,10 +366,8 @@ class Game:
                     print(f"Your result is {box.result}.") 
                     
                     if box.result < 21: 
-                        while True: 
-                            decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                            while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                decision = input("Invalid input! Please enter either Y or N: ") 
+                        while True:
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                             while not decision == "N" and box.result < 21: 
                                 box.cards = Game.hit(self, box.cards)
@@ -400,10 +383,7 @@ class Game:
                                     box.busted = True
                                     break
                                     
-                                decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                        
-                                while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                    decision = input("Invalid input! Please enter either Y or N: ")
+                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
                             break
                             
                     elif box.result > 21 and box.addedten == True:
@@ -412,9 +392,7 @@ class Game:
                         print(f"Your result is {box.result}.")
                         
                         while True: 
-                            decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                            while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                decision = input("Invalid input! Please enter either Y or N: ") 
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                             while not decision == "N" and box.result < 21: 
                                 box.cards = Game.hit(self, box.cards) 
@@ -436,10 +414,7 @@ class Game:
                                     break
 
                                 else:    
-                                    decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                        
-                                    while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                        decision = input("Invalid input! Please enter either Y or N: ")
+                                    decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
                             break
                     '''stay'''        
                 elif int(decision) == 2: 
@@ -451,13 +426,9 @@ class Game:
                 '''split'''
             elif box.cards[0] == box.cards[1]:
                 print(f"Your result is {box.result}.")
-                decision = input("You have four moves to chose from - 1 - hit, 2 - stay, 3 - surrender, 4 - split. Enter a number ranging from 1 to 4: ")
-                
-                while (not decision.isdigit()) or (not int(decision) in range(1,5)):
-                    decision = input("Inalid input! Enter a digit ranginf from 1 to 4: ")
 
-                decision = int(decision)
-                
+                decision = Player.take_input(self.player, "You have four moves to chose from - 1 - hit, 2 - stay, 3 - surrender, 4 - split. Enter a number ranging from 1 to 4: ", range(1,5), is_digit=True )
+
                 if decision == 1:
                     box.cards = Game.hit(self, box.cards)
                     box.result = sum(box.cards)
@@ -465,9 +436,7 @@ class Game:
 
                     if box.result < 21: 
                         while True: 
-                            decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                            while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                decision = input("Invalid input! Please enter either Y or N: ") 
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                             while not decision == "N" and box.result < 21: 
                                 box.cards = Game.hit(self, box.cards) 
@@ -479,10 +448,7 @@ class Game:
                                     print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
                                     break
 
-                                decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                        
-                                while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                    decision = input("Invalid input! Please enter either Y or N: ")
+                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
 
                             if box.result <= 21:
                                 print(f"You have just chosed to stay with result of {box.result}.") 
@@ -496,21 +462,16 @@ class Game:
                     Game.split(self,box)
                 '''hit, stay or surrrender'''
             elif box.result < 21:
-                decision = input(f"Your result is {box.result}. You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ") 
+                decision = Player.take_input(self.player, f"Your result is {box.result}. You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ", range(1,4), is_digit=True )
                 
-                while (not decision.isdigit()) or (not int(decision) in range (1, 4)): 
-                    decision = input("Invalid input! Please enter a number between 1 and 3 inclusive: ")
-                
-                if int(decision) == 1: 
+                if decision == 1: 
                     box.cards = Game.hit(self, box.cards)
                     box.result = sum(box.cards)
                     print(f"Your result is {box.result}") 
                     
                     if box.result < 21: 
                         while True: 
-                            decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                            while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                decision = input("Invalid input! Please enter either Y or N: ") 
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                             while not decision == "N" and box.result < 21: 
                                 box.cards = Game.hit(self, box.cards) 
@@ -536,10 +497,7 @@ class Game:
                                     print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
                                     break
  
-                                decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                        
-                                while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                    decision = input("Invalid input! Please enter either Y or N: ")
+                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
                             break
                             
                     elif box.result > 21 and box.addedten == True:
@@ -548,9 +506,7 @@ class Game:
                         print(f"Your result is {box.result}.")
                         
                         while True: 
-                            decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                            while (not decision.isalpha()) or (not decision == "Y") and  (not decision == "N"): 
-                                decision = input("Invalid input! Please enter either Y or N: ") 
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                             while not decision == "N" and box.result < 21: 
                                 box.cards = Game.hit(self, box.cards) 
@@ -572,10 +528,7 @@ class Game:
                                     break
 
                                 else:    
-                                    decision = input("Would you like to hit again? If yes, please enter Y otherwise enter N: ") 
-                        
-                                    while (not decision.isalpha()) or (not decision == "Y") and (not decision == "N"): 
-                                        decision = input("Invalid input! Please enter either Y or N: ")
+                                    decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
                             break
                     elif box.result > 21 and box.addedten == False:
                         box.busted = True
@@ -589,4 +542,4 @@ class Game:
 
         Game.deal_other_dealer_cards(self)                   
 game = Game() 
-game.play(game)
+game.play()
