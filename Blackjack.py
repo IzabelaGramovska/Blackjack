@@ -99,13 +99,12 @@ class Game:
         self.deck = Deck()  
         self.player = Player() 
         self.dealer = Dealer()
-        
-    def deal_player_first_card_per_box(self, boxposition): 
-        cards = [] 
-        card = self.deck.draw_card() 
-        print(f"The first card for box number {boxposition} is {Card.__str__(card)}") 
-        cards.append(card.value) 
-        
+
+    def deal_card(self, cards, prompt):
+        card = self.deck.draw_card()
+        print(f'' + prompt + f' is {Card.__str__(card)}')
+        cards.append(card.value)
+
         return cards 
         
     def pick_player_box(self, freeboxes, numofboxes):
@@ -114,24 +113,24 @@ class Game:
 
             while not boxposition in freeboxes:
                 boxposition = input("Invalid input! This box had been chosen already. Choose a new one:  ")
+                if boxposition in freeboxes:
+                    break
 
             freeboxes.remove(boxposition)
 
             wager = Player.take_player_wager(self.player)
-            self.player.balance -= wager 
-            cards = self.deal_player_first_card_per_box(boxposition)
-            self.player.boxes.append(Box(boxposition,wager,cards)) 
+            self.player.balance -= wager
+            cards = self.deal_card([], f"The first card for box number {boxposition}")
+            box = Box(boxposition,wager,cards)
+            self.player.boxes.append(box) 
             
         return self.player.boxes
             
     def deal_dealer_first_card(self): 
-        card = self.deck.draw_card()
-        self.dealer.cards.append(card.value)
-        self.dealer.result += card.value
-
-        print(f"The first card for the dealer is {Card.__str__(card)}")
+        self.dealer.cards = self.deal_card([], "The first card for the dealer")
+        self.dealer.result = sum(self.dealer.cards)
         
-        if card.value == 1: 
+        if self.dealer.cards[0] == 1: 
             self.dealer.insurance = True
             for box in self.player.boxes:
                 playerchoice = Player.choose_yes_or_no(self.player, "It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ")
@@ -142,13 +141,7 @@ class Game:
                     print("You just made an insurance. If the dealer has a blackjack, you will lose your original wager but the insurance bet will be paid 2 to 1.") 
                 else:
                     print("You have just chosen not to insure your bets.")
-        return self.dealer.cards 
-            
-    def deal_player_second_card_per_box(self, cards, boxposition): 
-        card = self.deck.draw_card()
-        cards.append(card.value) 
-        print(f"The second card for box number {boxposition} is {Card.__str__(card)}.") 
-        return cards 
+        return self.dealer.cards  
     
     def deal_other_dealer_cards(self):
         dealmorecards = False
@@ -157,67 +150,57 @@ class Game:
             if not box.blackjack and not box.surrender and not box.busted:
                 dealmorecards = True
 
-        if dealmorecards == True:
+        if dealmorecards:
+            self.dealer.cards = self.deal_card(self.dealer.cards, 'The new card the dealer has just drawn')
             self.dealer.result = sum(self.dealer.cards)
-            card = self.deck.draw_card() 
-            self.dealer.cards.append(card.value)
-            self.dealer.result += card.value
-            print(f"The new card the dealer has just drawn is {Card.__str__(card)} and the dealer's result till now is {self.dealer.result}.")
-
+            print(f"The dealer's result till now is {self.dealer.result}.")
+            
             if 1 in self.dealer.cards and 10 in self.dealer.cards:
                 self.dealer.insurance = True
 
                 for box in self.player.boxes:
-                    if box.insurance == True:
+                    if box.insurance:
                         box.profit = box.wager / 2
                         print(f"Insurance win! Your addtional insuarnce bet is paid 2:1 and your profit is {box.profit}")
-                    elif box.insurance == False:
+                    elif not box.insurance:
                         box.profit = 0
                         print(f"Insurance win! Unfortunately you loose all your wager. Your profit is 0.")
 
             while self.dealer.result < 17:
-                card = self.deck.draw_card() 
-                self.dealer.result += card.value
-                self.dealer.cards.append(card.value)
-
-                print(f"The card the dealer has just drawn is {Card.__str__(card)} and the dealer's result till now is {self.dealer.result}.")
-        
+                self.dealer.cards = self.deal_card(self.dealer.cards, 'The card the dealer has just drawn')
+                self.dealer.result += sum(self.dealer.cards)
+                print(f"The dealer's result till now is {self.dealer.result}.")
+                        
             if self.dealer.result > 17 and self.dealer.result < 22:
                 for box in self.player.boxes:
-                    if box.result == self.dealer.result and box.surrender == False:
+                    if box.result == self.dealer.result and not box.surrender:
                         print(f"It's a tie! You neither win nor loose, you just keep the money you have wagered.")
 
-                    elif box.busted == False and box.blackjack == False and box.surrender == False and box.result > self.dealer.result:
+                    elif not box.busted and not box.blackjack and not box.surrender and box.result > self.dealer.result:
                         box.profit = box.wager * 2
                         print(f"Congratulations to box at position {box.position}. You win as your result is over the dealer's one. Your profit is {box.profit}.")
                 
-                    elif box.busted == False and box.blackjack == False and box.surrender == False and box.result < self.dealer.result:
+                    elif not box.busted and not box.blackjack and not box.surrender and box.result < self.dealer.result:
                         print(f"Unfortunately the box at position {box.position} doesn't win as their result is under the dealer's one. Your profit is {box.profit}.")
             elif self.dealer.result > 21:
                 for box in self.player.boxes:
-                    if box.busted == False and box.surrender == False:
+                    if not box.busted and not box.surrender:
                         box.profit = box.wager * 2
                         print(f"Congratulations to box at position {box.position}. You win as the dealer's got busted. Your profit is {box.profit}.")
         
         print("The game has just ended!")
 
-    def hit(self, cards): 
-        card = self.deck.draw_card() 
-        cards.append(card.value)
-        print(f"The new card you just drawn is {Card.__str__(card)}.") 
-        
-        return cards 
+    def hit(self, cards):
+        return self.deal_card(cards, 'The new card you just drawn') 
         
     def surrender(self, box): 
         box.surrender = True 
         box.profit = box.wager / 2 
         print(f"Your result is {box.result}. You chosed to surrender, therefore the game has ended for you and your profit is {box.profit}")        
     
-    def double_down(self, box): 
-        card = self.deck.draw_card() 
-        box.cards.append(card.value)
-        print(f"The card you have just drawn is {Card.__str__(card)}.") 
-        box.result += card.value 
+    def double_down(self, box):  
+        box.cards = self.deal_card(box.cards, "The card you have just drawn")
+        box.result = sum(box.cards)
         box.wager += box.wager 
         
         if box.result > 21: 
@@ -230,7 +213,7 @@ class Game:
         else: print(f"Excellent! Your result is {box.result}") 
             
     def split(self, box):
-        extraboxwager = input(f"Choose how much you want to wager in your box, ranging from 10 to 10 000 inclusive: ") 
+        extraboxwager = input("Choose how much you want to wager in your box, ranging from 10 to 10 000 inclusive: ") 
         
         while (not extraboxwager.isdigit()) or (not int(extraboxwager) in range(10, 10001) or (int(extraboxwager) > self.balance)): 
             extraboxwager = input("Incorrect input! Please try again: ") 
@@ -239,16 +222,13 @@ class Game:
         
         extraboxwager = int(extraboxwager)
         extraboxcards = list(box.cards.pop(0))
-        extrabox = Box.Box(len((self.player.boxes) + 1), extraboxwager, extraboxcards)
+        extrabox = Box(len((self.player.boxes) + 1), extraboxwager, extraboxcards)
         extrabox.splitted = True
         
         box.splitted = True
-        
-        regboxsecondcard = self.deck.draw_card() 
-        extraboxsecondcard = self.deck.draw_card() 
-        
-        box.cards.append(regboxsecondcard.value) 
-        extrabox.cards.append(extraboxsecondcard.value)
+
+        box.cards = self.deal_card(box.cards, "The second card for the first box of the split")
+        extrabox.cards = self.deal_card(extrabox.cards, "The second card for the second box of the split") 
         
         for box in list(box, extrabox): 
             box.result = sum(box.cards) 
@@ -284,262 +264,283 @@ class Game:
                         break
                     break
                                 
-    def play(self):
-        '''Create all the boxes and give one card to all of them.'''
-        self.player.name = Player.take_player_name(self.player)
-        print(f"Hello {self.player.name}! Let's start playing!")
-        print(self.dealer)
-        self.player.balance = Player.take_player_balance(self.player)
-        numofboxes = self.pick_num_of_boxes()
-        self.player.boxes = Game.pick_player_box(self, Game.freeboxes, numofboxes)
-        
-        '''Give first card to the dealer and check for insurance''' 
-        self.dealer.cards = Game.deal_dealer_first_card(self) 
-        
-        '''Give a second card to all the boxes.''' 
-        for box in self.player.boxes: 
-            box.cards = Game.deal_player_second_card_per_box(self, box.cards, box.position)
-            print(f"All the player's cards for box at position {box.position} are {box.cards}")
-            box.result = sum(box.cards)
-            
-            
-            '''BJ and no insurance'''
-            if (1 in box.cards and 10 in box.cards) and (box.insurance == False): 
-                box.blackjack = True 
-                box.profit = box.wager * 3
+    def handle_blackjack(self, box):
+        if 1 in box.cards and 10 in box.cards:
+            box.blackjack = True 
+            box.profit = box.wager * 3
+
+            if box.insurance:
                 print(f"You have a BlackJack and you win! Your profit is {box.profit}. Congratulations!")
-                break
-                '''BJ and insurance'''
-            elif (1 in box.cards and 10 in box.cards) and (box.insurance == True): 
-                box.blackjack = True 
-                box.profit = box.wager 
-                print(f"You have a BlackJack and you win! You keep your money, your profit is {box.profit}")
-                '''busted'''
-            elif box.result > 21: 
-                box.busted = True 
-                print("You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
-                return
-                '''double down'''
-            elif box.result == 9 or box.result == 10 or box.result == 11:
-                decision = Player.choose_yes_or_no(self.player, "Card or double. Double is only one card. Insert 1 if you want a card, otherwise insert 2: ", [1,2], is_digit=True)
+            else:
+                print(f"You have a BlackJack and you win! Your profit is {box.profit}. Congratulations!")
+
+            return True
+        return False
+    
+    def handle_busted(self, box):
+        if box.result > 21: 
+            box.busted = True 
+            print("You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
+            return True
+        return False
+    
+    def handle_double_down(self, box):
+        if box.result in [9,10,11]:
+            decision = Player.choose_yes_or_no(self.player, "Card or double. Double is only one card. Insert 1 if you want a card, otherwise insert 2: ", [1,2], is_digit=True)
                 
-                if decision == 1:
-                    newdecision = "Y"
-                    while box.result < 21 and newdecision == "Y":
-                        box.cards = Game.hit(self, box.cards)
-                        box.result = sum(box.cards)
+            if decision == 1:
+                newdecision = "Y"
+                while box.result < 21 and newdecision == "Y":
+                    box.cards = Game.hit(self, box.cards)
+                    box.result = sum(box.cards)
 
-                        if 1 in box.cards and box.result > 21 and box.addedten == True:
-                            box.result -= 10
-                            box.addedten = False
-                            print(f"Your result is {box.result}.")
-
-                        if box.result > 21 and box.addedten == False:
-                            print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
-                            box.busted = True
-                            break
-
-                        if 1 in box.cards and box.result <= 11 and box.addedten == False:
-                            box.result += 10
-                            box.addedten = True
-                            print(f"Your result is {box.result}.")
-
-                        newdecision = Player.choose_yes_or_no(self.player, 'Would you like to hit again. If yes insert "Y" otherwise insert "N": ', ['Y', 'N'], is_digit=False)
-                        
-                        if newdecision == "N":
-                            print(f"Your result is {box.result}.")
-
-                elif decision == 2:
-                    Game.double_down(self, box)
-                '''1 or 11'''
-            elif 1 in box.cards and box.result <= 11: 
-                box.result += 10
-                box.addedten = True
-                print(f"Your result is {box.result}.") 
-
-                decision = Player.take_input(self.player, "You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is " 
-                                 + "to surrender. Please enter the number of your preferred one: ", range(1, 4), is_digit=True)
-
-                if int(decision) == 1: 
-                    box.cards = Game.hit(self, box.cards) 
-                    box.result = sum(box.cards) + 10
-                    print(f"Your result is {box.result}.") 
-                    
-                    if box.result < 21: 
-                        while True:
-                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
-                                
-                            while not decision == "N" and box.result < 21: 
-                                box.cards = Game.hit(self, box.cards)
-                                box.result = sum(box.cards) + 10
-                                
-                                if box.result > 21 and box.addedten == True:
-                                    box.result -= 10
-                                    box.addedten = False
-                                    print(f"Your result is {box.result}.")
-
-                                elif box.result > 21 and box.addedten == False:
-                                    print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
-                                    box.busted = True
-                                    break
-                                    
-                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
-                            break
-                            
-                    elif box.result > 21 and box.addedten == True:
+                    if 1 in box.cards and box.result > 21 and box.addedten:
                         box.result -= 10
                         box.addedten = False
                         print(f"Your result is {box.result}.")
-                        
-                        while True: 
-                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
-                                
-                            while not decision == "N" and box.result < 21: 
-                                box.cards = Game.hit(self, box.cards) 
-                                box.result = sum(box.cards)
-                                
-                                if box.result <= 11 and box.addedten == False:
-                                    box.result += 10
-                                    box.addedten = True
-                                    print(f"Your result is {box.result}.")
-                                
-                                elif box.result > 21 and box.addedten == True:
-                                    box.result -= 10
-                                    box.addedten = False
-                                    print(f"Your result is {box.result}.")
-                                
-                                elif box.result > 21 and box.addedten == False:
-                                    print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
-                                    box.busted = True
-                                    break
 
-                                else:    
-                                    decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
-                            break
+                    if box.result > 21 and not box.addedten:
+                        print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
+                        box.busted = True
+                        break
+
+                    if 1 in box.cards and box.result <= 11 and not box.addedten:
+                        box.result += 10
+                        box.addedten = True
+                        print(f"Your result is {box.result}.")
+
+                    newdecision = Player.choose_yes_or_no(self.player, 'Would you like to hit again. If yes insert "Y" otherwise insert "N": ', ['Y', 'N'], is_digit=False)
+                        
+                    if newdecision == "N":
+                        print(f"Your result is {box.result}.")
+
+            elif decision == 2:
+                Game.double_down(self, box)
+            return True
+        return False
+
+    def handle_1_or_11(self, box):
+        if 1 in box.cards and box.result <= 11: 
+            box.result += 10
+            box.addedten = True
+            print(f"Your result is {box.result}.") 
+
+            decision = Player.take_input(self.player, "You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ", range(1, 4), is_digit=True)
+
+            if decision == 1: 
+                box.cards = Game.hit(self, box.cards) 
+                box.result = sum(box.cards) + 10
+                    
+                if box.result < 21: 
+                    while True:
+                        decision = Player.choose_yes_or_no(self.player, f"Your result is {box.result}. Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
+                                
+                        while not decision == "N" and box.result < 21: 
+                            box.cards = Game.hit(self, box.cards)
+                            box.result = sum(box.cards) + 10
+                                
+                            if box.result > 21 and box.addedten:
+                                box.result -= 10
+                                box.addedten = False
+                                print(f"Your result is {box.result}.")
+
+                            elif box.result > 21 and not box.addedten:
+                                print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
+                                box.busted = True
+                                break
+                                    
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
+                        break
+                            
+                elif box.result > 21 and box.addedten:
+                    box.result -= 10
+                    box.addedten = False
+                    print(f"Your result is {box.result}.")
+                        
+                    while True: 
+                        decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
+                                
+                        while not decision == "N" and box.result < 21: 
+                            box.cards = Game.hit(self, box.cards) 
+                            box.result = sum(box.cards)
+                                
+                            if box.result <= 11 and not box.addedten:
+                                box.result += 10
+                                box.addedten = True
+                                print(f"Your result is {box.result}.")
+                                
+                            elif box.result > 21 and box.addedten:
+                                box.result -= 10
+                                box.addedten = False
+                                print(f"Your result is {box.result}.")
+                                
+                            elif box.result > 21 and not box.addedten:
+                                print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
+                                box.busted = True
+                                break
+
+                            else:    
+                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
+                        break
                     '''stay'''        
-                elif int(decision) == 2: 
-                    print(f"You have chosen to stay with result of {box.result}.")
-                    '''surrender'''
-                else:  
-                    print(f"Your result is {box.result}.") 
-                    Game.surrender(self, box)
-                '''split'''
-            elif box.cards[0] == box.cards[1]:
+            elif decision == 2: 
+                print(f"You have chosen to stay with result of {box.result}.")
+                '''surrender'''
+            else:  
+                print(f"Your result is {box.result}.") 
+                Game.surrender(self, box)
+            return True
+        return False
+
+    def handle_split(self, box):
+        if box.cards[0] == box.cards[1]:
+            print(f"Your result is {box.result}.")
+
+            decision = Player.take_input(self.player, "You have four moves to chose from - 1 - hit, 2 - stay, 3 - surrender, 4 - split. Enter a number ranging from 1 to 4: ", range(1,5), is_digit=True )
+
+            if decision == 1:
+                box.cards = Game.hit(self, box.cards)
+                box.result = sum(box.cards)
                 print(f"Your result is {box.result}.")
 
-                decision = Player.take_input(self.player, "You have four moves to chose from - 1 - hit, 2 - stay, 3 - surrender, 4 - split. Enter a number ranging from 1 to 4: ", range(1,5), is_digit=True )
-
-                if decision == 1:
-                    box.cards = Game.hit(self, box.cards)
-                    box.result = sum(box.cards)
-                    print(f"Your result is {box.result}.")
-
-                    if box.result < 21: 
-                        while True: 
-                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
+                if box.result < 21: 
+                    while True: 
+                        decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
-                            while not decision == "N" and box.result < 21: 
+                        while not decision == "N" and box.result < 21: 
+                            box.cards = Game.hit(self, box.cards) 
+                            box.result = sum(box.cards)
+                            print(f"Your result is {box.result}")
+
+                            if box.result > 21:
+                                box.busted = True
+                                print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
+                                break
+
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
+
+                        if box.result <= 21:
+                            print(f"You have just chosed to stay with result of {box.result}.") 
+
+                        break
+            elif decision == 2:
+                print(f"You have just chosed to stay with result of {box.result}.")
+            elif decision == 3:
+                Game.surrender(self, box)
+            elif decision == 4:
+                Game.split(self,box)
+            return True
+        return False
+
+    def handle_hit_stay_surrender(self,box):
+        if box.result < 21:
+            decision = Player.take_input(self.player, f"Your result is {box.result}. You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ", range(1,4), is_digit=True )
+                
+            if decision == 1: 
+                box.cards = Game.hit(self, box.cards)
+                box.result = sum(box.cards)
+                print(f"Your result is {box.result}") 
+                    
+                if box.result < 21: 
+                    while True: 
+                        decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
+                                
+                        while not decision == "N" and box.result < 21: 
+                            box.cards = Game.hit(self, box.cards) 
+                            box.result = sum(box.cards)
+                                
+                            if box.result <= 11 and not box.addedten:
+                                box.result += 10
+                                box.addedten = True
+                                print(f"Your result is {box.result}")
+                                
+                            elif box.result > 21 and box.addedten:
+                                box.result -= 10
+                                box.addedten = False
+                                print(f"Your result is {box.result}")
+                                
+                            elif box.result < 21 and box.addedten:
                                 box.cards = Game.hit(self, box.cards) 
                                 box.result = sum(box.cards)
                                 print(f"Your result is {box.result}")
 
-                                if box.result > 21:
-                                    box.busted = True
-                                    print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
-                                    break
-
-                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
-
-                            if box.result <= 21:
-                                print(f"You have just chosed to stay with result of {box.result}.") 
-
-                            break
-                elif decision == 2:
-                    print(f"You have just chosed to stay with result of {box.result}.")
-                elif decision == 3:
-                    Game.surrender(self, box)
-                elif decision == 4:
-                    Game.split(self,box)
-                '''hit, stay or surrrender'''
-            elif box.result < 21:
-                decision = Player.take_input(self.player, f"Your result is {box.result}. You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ", range(1,4), is_digit=True )
-                
-                if decision == 1: 
-                    box.cards = Game.hit(self, box.cards)
-                    box.result = sum(box.cards)
-                    print(f"Your result is {box.result}") 
-                    
-                    if box.result < 21: 
-                        while True: 
-                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
-                                
-                            while not decision == "N" and box.result < 21: 
-                                box.cards = Game.hit(self, box.cards) 
-                                box.result = sum(box.cards)
-                                
-                                if box.result <= 11 and box.addedten == False:
-                                    box.result += 10
-                                    box.addedten = True
-                                    print(f"Your result is {box.result}")
-                                
-                                elif box.result > 21 and box.addedten == True:
-                                    box.result -= 10
-                                    box.addedten = False
-                                    print(f"Your result is {box.result}")
-                                
-                                elif box.result < 21 and box.addedten == True:
-                                    box.cards = Game.hit(self, box.cards) 
-                                    box.result = sum(box.cards)
-                                    print(f"Your result is {box.result}")
-
-                                elif box.result > 21 and box.addedten == False:
-                                    box.busted = True
-                                    print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
-                                    break
+                            elif box.result > 21 and not box.addedten:
+                                box.busted = True
+                                print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
+                                break
  
-                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
-                            break
+                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
+                        break
                             
-                    elif box.result > 21 and box.addedten == True:
-                        box.result -= 10
-                        box.addedten = False
-                        print(f"Your result is {box.result}.")
+                elif box.result > 21 and box.addedten:
+                    box.result -= 10
+                    box.addedten = False
+                    print(f"Your result is {box.result}.")
                         
-                        while True: 
-                            decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
+                    while True: 
+                        decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
-                            while not decision == "N" and box.result < 21: 
-                                box.cards = Game.hit(self, box.cards) 
-                                box.result = sum(box.cards)
+                        while not decision == "N" and box.result < 21: 
+                            box.cards = Game.hit(self, box.cards) 
+                            box.result = sum(box.cards)
                                 
-                                if box.result <= 11:
-                                    box.result += 10
-                                    box.addedten = True
-                                    print(f"Your result is {box.result}")
+                            if box.result <= 11:
+                                box.result += 10
+                                box.addedten = True
+                                print(f"Your result is {box.result}")
                                 
-                                elif box.result > 21 and box.addedten == True:
-                                    box.result -= 10
-                                    box.addedten = False
-                                    print(f"Your result is {box.result}")
+                            elif box.result > 21 and box.addedten:
+                                box.result -= 10
+                                box.addedten = False
+                                print(f"Your result is {box.result}")
                                 
-                                elif box.result > 21 and box.addedten == False:
-                                    print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
-                                    box.busted = True
-                                    break
+                            elif box.result > 21 and not box.addedten:
+                                print(f"Your result is {box.result}. You are busted! You lose this game and all the money you have wagered! Go and cry :D!")
+                                box.busted = True
+                                break
 
-                                else:    
-                                    decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
-                            break
-                    elif box.result > 21 and box.addedten == False:
-                        box.busted = True
-                        print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
+                            else:    
+                                decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
+                        break
+                elif box.result > 21 and not box.addedten:
+                    box.busted = True
+                    print(f"You are busted and lose this game and all the money you have wagered! Go and cry :D!")
                     '''stay'''        
-                elif int(decision) == 2: 
-                    print(f"You have chosen to stay with result of {box.result}.")
-                    '''surrender'''
-                else: 
-                    Game.surrender(self, box)
+            elif decision == 2: 
+                print(f"You have chosen to stay with result of {box.result}.")
+                '''surrender'''
+            else: 
+                Game.surrender(self, box)
 
+    def play(self):
+        self.player.name = Player.take_player_name(self.player)
+        print(f"Hello {self.player.name}! Let's start playing!")
+        print(self.dealer)
+
+        self.player.balance = Player.take_player_balance(self.player)
+        numofboxes = self.pick_num_of_boxes()
+        self.player.boxes = Game.pick_player_box(self, Game.freeboxes, numofboxes)
+ 
+        self.dealer.cards = Game.deal_dealer_first_card(self) 
+        
+        for box in self.player.boxes: 
+            box.cards = self.deal_card(box.cards, f"The second card for box at position {box.position}")
+            print(f"All the player's cards for box at position {box.position} are {box.cards}")
+            box.result = sum(box.cards)
+            
+            if self.handle_blackjack(box):
+                break
+            elif self.handle_busted(box):
+                break
+            elif self.handle_double_down(box):
+                break
+            elif self.handle_1_or_11(box):
+                break
+            elif self.handle_split(box):
+                break
+            else:
+                self.handle_hit_stay_surrender(box)
+                
         Game.deal_other_dealer_cards(self)                   
 game = Game() 
 game.play()
