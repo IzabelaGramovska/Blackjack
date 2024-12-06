@@ -1,4 +1,36 @@
-import random 
+import pygame
+import copy
+import random
+
+pygame.init()
+
+cards = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+deck = (4 * cards) * 6
+
+WIDTH = 1510
+HEIGHT = 780
+
+screen = pygame.display.set_mode([WIDTH, HEIGHT])
+pygame.display.set_caption("Blackjack!")
+
+fps = 60
+timer = pygame.time.Clock()
+font = pygame.font.Font("freesansbold.ttf", 30)
+smaller_font = pygame.font.Font("freesansbold.ttf", 21)
+active = False
+'''initial_deal = True'''
+
+run = True
+while run:
+    timer.tick(fps)
+    screen.fill('dark blue')
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
+    
+    pygame.display.flip()
+pygame.quit()
 
 suites = ["Hearts", "Spades", "Diamonds", "Clubs"] 
 values = {"Two":2, "Three":3, "Four":4, "Five":5, "Six":6, "Seven":7, "Eight":8, "Nine":9, "Ten":10, "Jack":10, "Queen":10, "King":10, "Ace":1} 
@@ -206,7 +238,7 @@ class Game:
         if box.result > 21: 
             print(f"Your result is {box.result}. You are busted and lose this game. You loose all the money you have wagered! Go and cry :D!") 
             box.busted = True 
-        elif card.value == 1 and box.result <= 10: 
+        elif box.cards[2] == 1 and box.result <= 10: 
             box.result += 10
             box.addedten = True
             print(f"Excellent! Your result is {box.result}") 
