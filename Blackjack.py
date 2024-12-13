@@ -2,32 +2,29 @@ import pygame
 import random
 import sys
 
-suites = ["Hearts", "Spades", "Diamonds", "Clubs"] 
-values = {"Two":2, "Three":3, "Four":4, "Five":5, "Six":6, "Seven":7, "Eight":8, "Nine":9, "Ten":10, "Jack":10, "Queen":10, "King":10, "Ace":1} 
+values = {"2":2, "3":3, "4":4, "5":5, "6":6, "7":7, "8":8, "9":9, "10":10, "J":10, "Q":10, "K":10, "A":1} 
 ranks = list(values.keys())
-
 class Card: 
-    def __init__(self, rank, suite): 
+    def __init__(self, rank): 
         self.rank = rank 
-        self.suite = suite 
-        self.value = values[rank] 
+        self.value = values[rank]
         
     def __str__(self): 
-        return f"{self.rank} of {self.suite}" 
+        return f"{self.value} of {self.rank}" 
 
 class Deck: 
     def __init__(self):
-        self.cards = 6 * [Card(rank, suite) for rank in ranks for suite in suites]
+        self.cards = 6 * [Card(rank) for rank in ranks]
         random.shuffle(self.cards)
     
     def draw_card(self):
         return self.cards.pop()
     
 class Box: 
-    def __init__(self, position, wager, cards): 
+    def __init__(self, position, wager, coordinates): 
         self.position = position 
         self.wager = wager 
-        self.cards = cards 
+        self.cards = [] 
         self.result = 0 
         self.blackjack = False 
         self.profit = 0 
@@ -36,6 +33,7 @@ class Box:
         self.surrender = False
         self.splitted = False
         self.addedten = False
+        self.coordinates = coordinates
         
 class Player: 
     def __init__(self): 
@@ -58,26 +56,7 @@ class Player:
             elif not is_digit and value.isalpha():
                 return value
             # If the input is invalid
-            return None
-    
-    def choose_yes_or_no(self, prompt, values, is_digit = True):
-        value = input(prompt)
-
-        while True:
-            if is_digit and value.isdigit():
-                value = int(value)
-                if value in values:
-                    return value
-            elif not is_digit and value.isalpha():
-                if value in values:
-                    return value
-            value = input(f'Invalid input. Please try again. Enter either {values[0]} or {values[1]}: ')
-
-    def take_player_balance(self): 
-        return self.validate_input("Enter your balance (1-100000): ", range(5, 100001)) 
-        
-    def take_player_wager(self):
-       return self.validate_input(f"Enter your wager (10-{self.balance}): ", range(10, self.balance + 1))
+            return None 
         
     def __str__(self): 
         return f"My name is {self.name} and I have {self.balance} balance." 
@@ -94,21 +73,11 @@ class Dealer:
 
 class Logic:
     freeboxes = [1, 2, 3, 4, 5, 6, 7]
-    
-    def pick_num_of_boxes(self):
-        return Player.validate_input(self.player,'Choose how many boxes you want to play with, ranging from 1 to 7, inclusive: ', range(1,8), is_digit=True)
         
     def __init__(self): 
         self.deck = Deck()  
         self.player = Player() 
         self.dealer = Dealer()
-
-    def deal_card(self, cards, prompt):
-        card = self.deck.draw_card()
-        print(f'' + prompt + f' is {Card.__str__(card)}')
-        cards.append(card.value)
-
-        return cards 
         
     def pick_player_box(self, freeboxes, numofboxes):
         for box in range(1, numofboxes + 1):
@@ -128,24 +97,7 @@ class Logic:
             self.player.boxes.append(box) 
             
         return self.player.boxes
-            
-    def deal_dealer_first_card(self): 
-        self.dealer.cards = self.deal_card([], "The first card for the dealer")
-        self.dealer.result = sum(self.dealer.cards)
-        
-        if self.dealer.cards[0] == 1: 
-            self.dealer.insurance = True
-            for box in self.player.boxes:
-                playerchoice = Player.choose_yes_or_no(self.player, "It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ")
-
-                if playerchoice == "Y": 
-                    box.wager += box.wager / 2 
-                    box.insurance = True 
-                    print("You just made an insurance. If the dealer has a blackjack, you will lose your original wager but the insurance bet will be paid 2 to 1.") 
-                else:
-                    print("You have just chosen not to insure your bets.")
-        return self.dealer.cards  
-    
+          
     def deal_other_dealer_cards(self):
         dealmorecards = False
 
@@ -247,7 +199,7 @@ class Logic:
                         decision = input("Invalid input! Please enter either Y or N: ")
                         
                         while not decision == "N" and box.result < 21: 
-                            box.cards = Logic.hit(self, box.cards) 
+                            box.cards = self.hit(self, box.cards) 
                             box.result = sum(box.cards) 
                             
                             if box.result > 21: 
@@ -294,7 +246,7 @@ class Logic:
             if decision == 1:
                 newdecision = "Y"
                 while box.result < 21 and newdecision == "Y":
-                    box.cards = Logic.hit(self, box.cards)
+                    box.cards = self.hit(self, box.cards)
                     box.result = sum(box.cards)
 
                     if 1 in box.cards and box.result > 21 and box.addedten:
@@ -318,7 +270,7 @@ class Logic:
                         print(f"Your result is {box.result}.")
 
             elif decision == 2:
-                Logic.double_down(self, box)
+                self.double_down(self, box)
             return True
         return False
 
@@ -331,7 +283,7 @@ class Logic:
             decision = Player.validate_input(self.player, "You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ", range(1, 4), is_digit=True)
 
             if decision == 1: 
-                box.cards = Logic.hit(self, box.cards) 
+                box.cards = self.hit(self, box.cards) 
                 box.result = sum(box.cards) + 10
                     
                 if box.result < 21: 
@@ -339,7 +291,7 @@ class Logic:
                         decision = Player.choose_yes_or_no(self.player, f"Your result is {box.result}. Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                         while not decision == "N" and box.result < 21: 
-                            box.cards = Logic.hit(self, box.cards)
+                            box.cards = self.hit(self, box.cards)
                             box.result = sum(box.cards) + 10
                                 
                             if box.result > 21 and box.addedten:
@@ -364,7 +316,7 @@ class Logic:
                         decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                         while not decision == "N" and box.result < 21: 
-                            box.cards = Logic.hit(self, box.cards) 
+                            box.cards = self.hit(self, box.cards) 
                             box.result = sum(box.cards)
                                 
                             if box.result <= 11 and not box.addedten:
@@ -391,7 +343,7 @@ class Logic:
                 '''surrender'''
             else:  
                 print(f"Your result is {box.result}.") 
-                Logic.surrender(self, box)
+                self.surrender(self, box)
             return True
         return False
 
@@ -402,7 +354,7 @@ class Logic:
             decision = Player.validate_input(self.player, "You have four moves to chose from - 1 - hit, 2 - stay, 3 - surrender, 4 - split. Enter a number ranging from 1 to 4: ", range(1,5), is_digit=True )
 
             if decision == 1:
-                box.cards = Logic.hit(self, box.cards)
+                box.cards = self.hit(self, box.cards)
                 box.result = sum(box.cards)
                 print(f"Your result is {box.result}.")
 
@@ -411,7 +363,7 @@ class Logic:
                         decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                         while not decision == "N" and box.result < 21: 
-                            box.cards = Logic.hit(self, box.cards) 
+                            box.cards = self.hit(self, box.cards) 
                             box.result = sum(box.cards)
                             print(f"Your result is {box.result}")
 
@@ -429,9 +381,9 @@ class Logic:
             elif decision == 2:
                 print(f"You have just chosed to stay with result of {box.result}.")
             elif decision == 3:
-                Logic.surrender(self, box)
+                self.surrender(self, box)
             elif decision == 4:
-                Logic.split(self,box)
+                self.split(self,box)
             return True
         return False
 
@@ -440,7 +392,7 @@ class Logic:
             decision = Player.validate_input(self.player, f"Your result is {box.result}. You have 3 moves to choose from. The first one is to hit, the second one is to stay, the third one is to surrender. Please enter the number of your preferred one: ", range(1,4), is_digit=True )
                 
             if decision == 1: 
-                box.cards = Logic.hit(self, box.cards)
+                box.cards = self.hit(self, box.cards)
                 box.result = sum(box.cards)
                 print(f"Your result is {box.result}") 
                     
@@ -449,7 +401,7 @@ class Logic:
                         decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                         while not decision == "N" and box.result < 21: 
-                            box.cards = Logic.hit(self, box.cards) 
+                            box.cards = self.hit(self, box.cards) 
                             box.result = sum(box.cards)
                                 
                             if box.result <= 11 and not box.addedten:
@@ -463,7 +415,7 @@ class Logic:
                                 print(f"Your result is {box.result}")
                                 
                             elif box.result < 21 and box.addedten:
-                                box.cards = Logic.hit(self, box.cards) 
+                                box.cards = self.hit(self, box.cards) 
                                 box.result = sum(box.cards)
                                 print(f"Your result is {box.result}")
 
@@ -484,7 +436,7 @@ class Logic:
                         decision = Player.choose_yes_or_no(self.player, "Would you like to hit again? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False) 
                                 
                         while not decision == "N" and box.result < 21: 
-                            box.cards = Logic.hit(self, box.cards) 
+                            box.cards = self.hit(self, box.cards) 
                             box.result = sum(box.cards)
                                 
                             if box.result <= 11:
@@ -513,7 +465,7 @@ class Logic:
                 print(f"You have chosen to stay with result of {box.result}.")
                 '''surrender'''
             else: 
-                Logic.surrender(self, box)
+                self.surrender(self, box)
     
 class RenderGame:
     def __init__(self):
@@ -526,76 +478,398 @@ class RenderGame:
         self.input_font = pygame.font.Font(None, 21)
         self.WHITE = (255, 255, 255)
         self.BLACK = (0, 0, 0)
-        self.input_box = pygame.Rect(300, 250, 200, 40)
+        self.RED = (255, 0, 0)
+        self.input_box = pygame.Rect(600, 320, 200, 40)
         self.color_inactive = pygame.Color('lightskyblue3')
         self.color_active = pygame.Color('dodgerblue2')
         self.clock = pygame.time.Clock()
         self.active = False
         self.color = self.color_inactive
         self.show_invalid_message = False
-        self.cards_displayed = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
         self.fps = 60
         self.logic = Logic()
+        self.show_invalid_message = False
 
-    def draw_prompt(self, text, color, position):
+    def draw_text(self, text, color, position):
         prompt_surface = self.font.render(text, True, color)
         self.screen.blit(prompt_surface, position)
 
-    def take_player_name(self, input, show_invalid_message):
-        self.screen.fill('skyblue3')
-        self.draw_prompt("Please enter your name: ", self.BLACK, (250,200))
+    def take_player_name(self):
+        self.logic.player.name = ''
+        self.show_invalid_message = False
 
-        if show_invalid_message:
-            invalid_text = self.font.render("Invalid input. Please try again.", True, (255, 0, 0))
-            self.screen.blit(invalid_text, (250, 150))
+        while True:
+            self.screen.fill('skyblue')
 
-        txt_surface = self.input_font.render(input, True, self.color)
-        width = max(200, txt_surface.get_width() + 10)
-        self.input_box.w = width
-        self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
-        pygame.draw.rect(self.screen, self.color, self.input_box, 2)
+            if not self.show_invalid_message:
+                self.draw_text("Please enter your name:",self.BLACK, (600,250))
+            else:
+                self.draw_text("Invalid input. Please try again.", self.RED, (600,250))
 
-        pygame.display.flip()
+            txt_surface = self.input_font.render(self.logic.player.name, True, self.BLACK)
+            width = max(300, txt_surface.get_width() + 10)
+            self.input_box.w = width
+            self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
+            pygame.draw.rect(self.screen, self.color, self.input_box, 2)
 
-        return self.input_box
-    
-    def run(self):
-        run = True
-        while run:
-            self.take_player_name(self.logic.player.name, self.show_invalid_message)
+            pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    run = False
-
+                    pygame.quit()
+                    sys.exit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if self.input_box.collidepoint(event.pos):
                         self.active = not self.active
                     else:
                         self.active = False
                     self.color = self.color_active if self.active else self.color_inactive
-
                 elif event.type == pygame.KEYDOWN and self.active:
                     if event.key == pygame.K_RETURN:
-                        validated_name = Player.validate_input(self.logic.player.name, is_digit=False)
-                        if validated_name:
-                            self.logic.player.name = validated_name
-                            '''logic.play()'''
-                            print(f"Hello {self.logic.player.name}! Let's start playing!")
-                            print(self.logic.dealer)
-                            run = False
+                        if self.logic.player.name.strip() and not self.logic.player.name.isdigit():
+                            self.show_invalid_message = False
+                            return self.logic.player.name.strip()
                         else:
                             self.show_invalid_message = True
-                            self.logic.player.name = ""
                     elif event.key == pygame.K_BACKSPACE:
                         self.logic.player.name = self.logic.player.name[:-1]
                     else:
                         self.logic.player.name += event.unicode
+    
+    def take_player_balance(self):
+        balance_input = ''
+        self.show_invalid_message = False
 
-            self.clock.tick(self.fps)
-        pygame.quit()
-        sys.exit()
+        while True:
+            self.screen.fill('skyblue')
+            
+            if not self.show_invalid_message:
+                self.draw_text("Enter your balance (10-100000):",self.BLACK, (600,250))
+            else:
+                self.draw_text("Invalid input. Please try again.", self.RED, (600,250))
+
+            txt_surface = self.input_font.render(balance_input, True, self.BLACK)
+            width = max(200, txt_surface.get_width() + 10)
+            self.input_box.w = width
+            self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
+            pygame.draw.rect(self.screen, self.color, self.input_box, 2)
+
+            pygame.display.flip() 
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.input_box.collidepoint(event.pos):
+                        self.active = not self.active
+                    else:
+                        self.active = False
+                    self.color = self.color_active if self.active else self.color_inactive
+                elif event.type == pygame.KEYDOWN and self.active:
+                    if event.key == pygame.K_RETURN:
+                        if balance_input.isdigit():
+                            balance = int(balance_input)
+                        if 10 <= balance <= 100000:
+                            self.show_invalid_message = False
+                            return balance
+                        self.show_invalid_message = True
+                        balance_input = ''
+                    elif event.key == pygame.K_BACKSPACE:
+                        balance_input = balance_input[:-1]
+                    else:
+                        balance_input += event.unicode
+
+    def display_greetings(self):
+        while True:
+            self.screen.fill('skyblue')
+            self.draw_text(f"Hello {self.logic.player.name}! Let's start playing!", self.BLACK, (410,350))
+            self.draw_text(f"{self.logic.dealer}", self.BLACK, (410, 410) )
+            
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    return
+    
+    def take_num_of_boxes(self):
+        user_input = ''
+        self.show_invalid_message = False
+
+        while True:
+            self.screen.fill('skyblue')
+
+            if not self.show_invalid_message:
+                self.draw_text("Enter the number of boxes you want to play with, which can range from one to seven", self.BLACK, (250, 250))
+            else:
+                self.draw_text("Invalid input. Please try again.", self.RED, (400,250))
+            
+            txt_surface = self.input_font.render(user_input, True, self.BLACK)
+            width = max(200, txt_surface.get_width() + 10)
+            self.input_box.w = width
+            self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
+            pygame.draw.rect(self.screen, self.color, self.input_box, 2)
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.input_box.collidepoint(event.pos):
+                        self.active = not self.active
+                    else:
+                        self.active = False
+                    self.color = self.color_active if self.active else self.color_inactive
+                elif event.type == pygame.KEYDOWN and self.active:
+                    if event.key == pygame.K_RETURN:
+                        if user_input.isdigit():
+                            user_input = int(user_input)
+                        if 1 <= user_input <= 7:
+                            self.show_invalid_message = False
+                            return user_input
+                        self.show_invalid_message = True
+                        user_input = ''
+                    elif event.key == pygame.K_BACKSPACE:
+                        user_input = user_input[:-1]
+                    else:
+                        user_input += event.unicode
+
+    def draw_boxes(self):
+        while True:
+            self.screen.fill('skyblue')
+
+            for i in range(7):
+                left_float = 215 * i
+                pygame.draw.rect(self.screen, 'darkblue', [12 + left_float, 12, 190, 320], 0, 5)
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    return
+    
+    def pick_free_box(self, number_of_boxes):
+        free_boxes = [1, 2, 3, 4, 5, 6, 7]
+        busy_box = False
+        user_input = ''
+        boxes_list = []
+
+        for i in range(number_of_boxes):
+            run = True
+            while run:
+                self.screen.fill('skyblue')
+
+                if not busy_box:
+                    self.draw_text(f"The free boxes you can choose from are at positions {free_boxes}. Choose your preferred one: ", self.BLACK, (250,250))
+                else:
+                    self.draw_text(f"Invalid input! This box had been chosen already. Choose a new one from the positions {free_boxes}:  ", self.RED, (250,250))
+                
+                txt_surface = self.input_font.render(user_input, True, self.BLACK)
+                width = max(200, txt_surface.get_width() + 10)
+                self.input_box.w = width
+                self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
+                pygame.draw.rect(self.screen, self.color, self.input_box, 2)
+
+                pygame.display.flip() 
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        if self.input_box.collidepoint(event.pos):
+                            self.active = not self.active
+                        else:
+                            self.active = False
+                        self.color = self.color_active if self.active else self.color_inactive
+                    elif event.type == pygame.KEYDOWN and self.active:
+                        if event.key == pygame.K_RETURN:
+                            if user_input.isdigit():
+                                user_input_int = int(user_input)
+                                if user_input_int in free_boxes:
+                                    free_boxes.remove(user_input_int)
+                                    boxes_list.append(user_input_int)
+                                    busy_box = False
+                                    user_input = ''
+                                    run = False
+                                elif not user_input.isdigit() or not user_input in free_boxes:
+                                    busy_box = True
+                                    user_input = ''
+                        elif event.key == pygame.K_BACKSPACE:
+                            user_input = user_input[:-1]
+                        else:
+                            user_input += event.unicode
+            run = True
+        return boxes_list
+
+    def take_player_wager(self, box_position):
+        wager = ''
+        self.show_invalid_message = False
+
+        'range(10, self.balance + 1)'
+
+        while True:
+            self.screen.fill('skyblue')
+
+            if not self.show_invalid_message:
+                self.draw_text(f"Enter the desired wager, which can be somewhere between 10 and {self.logic.player.balance}, in the box at position {box_position}: ", self.BLACK, (200, 250))
+            else:
+                self.draw_text("Invalid input. Please try again.", self.RED, (400,250))
+            
+            txt_surface = self.input_font.render(wager, True, self.BLACK)
+            width = max(200, txt_surface.get_width() + 10)
+            self.input_box.w = width
+            self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
+            pygame.draw.rect(self.screen, self.color, self.input_box, 2)
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.input_box.collidepoint(event.pos):
+                        self.active = not self.active
+                    else:
+                        self.active = False
+                    self.color = self.color_active if self.active else self.color_inactive
+                elif event.type == pygame.KEYDOWN and self.active:
+                    if event.key == pygame.K_RETURN:
+                        if wager.isdigit():
+                            wager = int(wager)
+                        if 10 <= wager <= self.logic.player.balance:
+                            self.show_invalid_message = False
+                            return wager
+                        self.show_invalid_message = True
+                        wager = ''
+                    elif event.key == pygame.K_BACKSPACE:
+                        wager = wager[:-1]
+                    else:
+                        wager += event.unicode
+
+    def choose_yes_or_no(self, prompt, values, is_digit=True):
+        choice = ''
+        self.show_invalid_message = False
+
+        while True:
+            self.screen.fill('skyblue')
+
+            if not self.show_invalid_message:
+                self.draw_text(prompt, self.BLACK, (350, 250))
+            else:
+                self.draw_text(f'Invalid input. Please try again. Enter either {values[0]} or {values[1]}.', self.RED, (400, 250))
+
+            txt_surface = self.input_font.render(choice, True, self.BLACK)
+            width = max(200, txt_surface.get_width() + 10)
+            self.input_box.w = width
+            self.screen.blit(txt_surface, ((self.input_box.x + 5, self.input_box.y + 5)))
+            pygame.draw.rect(self.screen, self.color, self.input_box, 2)
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.input_box.collidepoint(event.pos):
+                        self.active = not self.active
+                    else:
+                        self.active = False
+                    self.color = self.color_active if self.active else self.color_inactive
+                elif event.type == pygame.KEYDOWN and self.active:
+                    if event.key == pygame.K_RETURN:
+                        if is_digit and choice.isdigit():
+                            choice = int(choice)
+                            if choice in values:
+                                self.show_invalid_message = False
+                                return choice
+                        elif not is_digit and choice.isalpha():
+                            self.show_invalid_message = False
+                            return choice
+                        else:
+                            self.show_invalid_message = True
+                            choice = ''
+                    elif event.key == pygame.K_BACKSPACE:
+                        wager = wager[:-1]
+                    else:
+                        wager += event.unicode
+
+    def deal_initial_cards(self):
+        self.screen.fill('skyblue')
+        for i in range(7):
+            left_float = 215 * i
+            pygame.draw.rect(self.screen, 'darkblue', [12 + left_float, 12, 190, 320], 0, 5)
+
+        for box in self.logic.player.boxes:
+            x, y, width, height = box.coordinates
+
+            # Adjust card position inside the box
+            card_x = x + (width // 2) - 30  # Center the card horizontally
+            card_y = y + (height // 3)      # Place the card vertically inside the box
+
+            # Draw one card for the box
+            new_card = self.logic.deck.draw_card()
+            box.cards.append(new_card.value)
+
+            # Draw the new card
+            pygame.draw.rect(self.screen, 'white', [card_x, card_y, 60, 90], 0, 5)  # Card background
+            self.screen.blit(self.font.render(new_card.rank, True, "black"), (card_x + 10, card_y + 10))  # Card rank
+
+        # Deal one card to the dealer
+        dealer_x, dealer_y = 1000, 50  # Fixed dealer position
+        new_card = self.logic.deck.draw_card()
+        self.logic.dealer.cards.append(new_card.value)
+        self.logic.dealer.result = sum(self.logic.dealer.cards)
+
+        # Draw the dealer's card
+        pygame.draw.rect(self.screen, 'white', [dealer_x, dealer_y, 60, 90], 0, 5)  # Card background
+        self.screen.blit(self.font.render(new_card.rank, True, "black"), (dealer_x + 10, dealer_y + 10))  # Card rank
+
+        pygame.display.flip()
+        
+        # in case of insurance
+        if self.logic.dealer.cards[0] == 1: 
+            self.logic.dealer.insurance = True
+            for box in self.logic.player.boxes:
+                player_choice = self.choose_yes_or_no("It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ")
+
+                if player_choice == "Y": 
+                    box.wager += box.wager / 2 
+                    box.insurance = True
+
+                    self.screen.fill('skyblue')
+                    self.draw_text("You just made an insurance. If the dealer has a blackjack, you will lose your original wager but the insurance bet will be paid 2 to 1.", self.BLACK, (200,250))
+                else:
+                    self.screen.fill('skyblue')
+                    self.draw_text("You have just chosen not to insure your bets.", self.BLACK, (200,250))
+
+    def run(self):
+        self.logic.player.name = self.take_player_name()
+        self.logic.player.balance = self.take_player_balance()
+        self.display_greetings()
+        num_of_boxes = self.take_num_of_boxes()
+        boxes_positions = self.pick_free_box(num_of_boxes)
+        print(boxes_positions)
+
+        for i in range(len(boxes_positions)):
+            wager = self.take_player_wager(boxes_positions[i])
+            self.logic.player.balance -= wager
+            left_float = 215 * boxes_positions[i] 
+            self.logic.player.boxes.append(Box(boxes_positions[i], wager, (12 + left_float, 12, 190, 320)))
+
+        self.draw_boxes()
+        self.deal_initial_cards()
+        
+
 game = RenderGame()
 game.run()
-
-    
