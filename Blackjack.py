@@ -841,7 +841,7 @@ class RenderGame:
         if self.logic.dealer.cards[0] == 1: 
             self.logic.dealer.insurance = True
             for box in self.logic.player.boxes:
-                player_choice = self.choose_yes_or_no("It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ")
+                player_choice = self.choose_yes_or_no("It is insurance time. Would you like to insure your bets? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
 
                 if player_choice == "Y": 
                     box.wager += box.wager / 2 
@@ -864,7 +864,7 @@ class RenderGame:
         for i in range(len(boxes_positions)):
             wager = self.take_player_wager(boxes_positions[i])
             self.logic.player.balance -= wager
-            left_float = 215 * boxes_positions[i] 
+            left_float = 215 * (boxes_positions[i] - 1)
             self.logic.player.boxes.append(Box(boxes_positions[i], wager, (12 + left_float, 12, 190, 320)))
 
         self.draw_boxes()
