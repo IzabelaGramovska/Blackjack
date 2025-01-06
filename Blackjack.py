@@ -310,14 +310,64 @@ class RenderGame:
                     self.color = self.color_active if self.active else self.color_inactive
                 elif event.type == pygame.KEYDOWN and self.active:
                     if event.key == pygame.K_RETURN:
-                        if choice.strip() in values:
-                            return choice.strip()
-                        self.show_invalid_message = True
-                        choice = ''
+                        if choice.strip().upper() in values:
+                            return choice.strip().upper()
+                        else:
+                            self.show_invalid_message = True
+                            choice = ''
                     elif event.key == pygame.K_BACKSPACE:
                         choice = choice[:-1]
                     else:
                         choice += event.unicode
+    def draw_box_with_cards(self, box):
+        x, y, width, height = box.coordinates
+        pygame.draw.rect(self.screen, 'darkblue', [x, y, width, height], 0, 5)
+
+        if box.splitted:
+            half_width = width // 2
+            card_spacing_x = 15
+            card_spacing_y = 25
+
+            for i, card_value in enumerate(box.cards[0]):
+                card_x = x + 10 + i * card_spacing_x
+                card_y = y + 20 + i * card_spacing_y
+                pygame.draw.rect(self.screen, 'white', [card_x, card_y, 40, 60], 0, 5)
+                pygame.draw.rect(self.screen, 'red', [card_x, card_y, 40, 60], 3, 5)
+                card_rank = next(rank for rank, value in values.items() if value == card_value)
+                self.screen.blit(self.font.render(card_rank, True, "black"), (card_x + 10, card_y + 10))
+
+            for i, card_value in enumerate(box.cards[1]):
+                card_x = x + half_width + 10 + i * card_spacing_x
+                card_y = y + 20 + i * card_spacing_y
+                pygame.draw.rect(self.screen, 'white', [card_x, card_y, 40, 60], 0, 5)
+                pygame.draw.rect(self.screen, 'red', [card_x, card_y, 40, 60], 3, 5)
+                card_rank = next(rank for rank, value in values.items() if value == card_value)
+                self.screen.blit(self.font.render(card_rank, True, "black"), (card_x + 10 , card_y + 10))
+        else:
+            card_spacing_x = 15
+            card_spacing_y = 25
+            for i, card_value in enumerate(box.cards):
+                card_x = x + 10 + i * card_spacing_x
+                card_y = y + 20 + i * card_spacing_y
+                pygame.draw.rect(self.screen, 'white', [card_x, card_y, 80, 110], 0, 5)
+                pygame.draw.rect(self.screen, 'red', [card_x, card_y, 80, 110], 3, 5)
+                card_rank = next(rank for rank, value in values.items() if value == card_value)
+                self.screen.blit(self.font.render(card_rank, True, "black"), (card_x + 10, card_y + 10))
+
+        self.draw_score(box)
+    
+    def deal_a_new_card_to_stack(self, box, stack_index):
+        new_card = self.logic.deck.draw_card()
+        box.cards[stack_index].append(new_card.value)
+
+        stack_sum = sum(box.cards[stack_index])
+        if 1 in box.cards[stack_index] and stack_sum <= 11:
+            stack_sum += 10  
+
+        box.result = stack_sum
+
+        self.draw_box_with_cards(box)
+        pygame.display.flip()
 
     def deal_initial_cards(self):
         self.screen.fill('skyblue')
@@ -326,26 +376,48 @@ class RenderGame:
             pygame.draw.rect(self.screen, 'darkblue', [12 + left_float, 12, 190, 320], 0, 5)
 
         for box in self.logic.player.boxes:
-            self.deal_a_new_card(box)              
+            self.deal_a_new_card(box)             
 
         dealer_x, dealer_y = 640, 630
         new_card = self.logic.deck.draw_card()
         self.logic.dealer.cards.append(new_card.value)
-        self.logic.dealer.result = sum(self.logic.dealer.cards)
+        self.logic.dealer.result = sum(card for card in self.logic.dealer.cards)
         pygame.draw.rect(self.screen, 'white', [dealer_x, dealer_y, 80, 110], 0, 5)
         pygame.draw.rect(self.screen, 'blue', [dealer_x, dealer_y, 80, 110], 3, 5) 
         self.screen.blit(self.font.render(new_card.rank, True, "black"), (dealer_x + 10, dealer_y + 10))
 
         pygame.display.flip()
+        pygame.time.wait(2000)
         
-        if self.logic.dealer.cards[0] == 1: 
+        if new_card.rank == 'A': 
             self.logic.dealer.insurance = True
             for box in self.logic.player.boxes:
-                player_choice = self.choose_yes_or_no(f"It is insurance time. Would you like to insure your bets in box at position {box.position}? If yes, please enter Y otherwise enter N: ", ['Y', 'N'], is_digit=False)
+                if self.logic.player.balance >= box.wager / 2:
+                    player_choice = self.choose_yes_or_no(f"It is insurance time. Would you like to insure your bets in box at position {box.position}? If yes, please enter Y otherwise enter N: ", ['Y', 'N'])
 
-                if player_choice == "Y": 
-                    box.wager += box.wager / 2 
-                    box.insurance = True
+                    if player_choice == "Y":
+                        self.logic.player.balance -= box.wager / 2
+                        box.wager += box.wager / 2
+                        box.insurance = True
+                else:
+                    self.screen.fill('skyblue')
+                    self.draw_text(f"Not enough balance for insurance on box {box.position}!", self.RED, (400, 300))
+                    pygame.display.flip()
+                    pygame.time.wait(2000)
+
+            self.screen.fill('skyblue')
+            for i in range(7):
+                left_float = 215 * i
+                pygame.draw.rect(self.screen, 'darkblue', [12 + left_float, 12, 190, 320], 0, 5)
+
+            for box in self.logic.player.boxes:
+                self.draw_box_with_cards(box)
+
+            pygame.draw.rect(self.screen, 'white', [dealer_x, dealer_y, 80, 110], 0, 5)
+            pygame.draw.rect(self.screen, 'blue', [dealer_x, dealer_y, 80, 110], 3, 5) 
+            self.screen.blit(self.font.render(new_card.rank, True, "black"), (dealer_x + 10, dealer_y + 10))
+
+            pygame.display.flip()
                 
     def render_decision_buttons(self, actions):
         button_area_rect = pygame.Rect(20, 400, 350, 350)  
@@ -378,12 +450,24 @@ class RenderGame:
 
         pygame.display.update(button_area_rect)
         return buttons
+    
+    def deal_a_new_card_to_stack(self, box, stack_index):
+        new_card = self.logic.deck.draw_card()
+        box.cards[stack_index].append(new_card.value)
 
-    def handle_decision_input(self, box):
-        actions = ["HIT", "STAY", "SURRENDER"] 
-        if len(box.cards) == 2 and box.cards[0] == box.cards[1]:  
+        stack_sum = sum(box.cards[stack_index])
+        if 1 in box.cards[stack_index] and stack_sum <= 11:
+            stack_sum += 10  
+
+        box.result = stack_sum  
+        self.draw_box_with_cards(box)  
+        pygame.display.flip()
+
+    def handle_decision_input(self, box, stack_index=None):
+        actions = ["HIT", "STAY", "SURRENDER"]
+        if len(box.cards) == 2 and box.cards[0] == box.cards[1] and self.logic.player.balance >= box.wager:
             actions.append("SPLIT")
-        if len(box.cards) == 2 and 9 <= box.result <= 11:  
+        if not box.splitted and self.logic.player.balance >= box.wager * 2 and len(box.cards) == 2 and 9 <= box.result <= 11:
             actions.append("DOUBLE")
 
         buttons = self.render_decision_buttons(actions)
@@ -396,49 +480,21 @@ class RenderGame:
                 if event.type == pygame.MOUSEBUTTONUP:
                     for action, button in buttons.items():
                         if button.collidepoint(event.pos):
-                            if action == "HIT":
-                                self.deal_a_new_card(box)
-                                return "HIT"
-                            elif action == "STAY":
-                                return "STAY"
-                            elif action == "SPLIT":
-                                #self.split(box)
-                                return "SPLIT"
-                            elif action == "DOUBLE":
-                                self.double_down(box)
-                                return "DOUBLE"
-                            elif action == "SURRENDER":
-                                self.surrender(box)
-                                return "SURRENDER"            
+                            return action
 
-    def deal_a_new_card(self, box):
+
+    def deal_a_new_card(self, box, split_box_cards = []):
         new_card = self.logic.deck.draw_card()
         box.cards.append(new_card.value)
 
-        if len(box.cards) > 1 and 1 in box.cards and sum(box.cards) <= 11 and not box.addedten:
-            box.result = sum(box.cards) + 10
-            box.addedten = True
-        elif len(box.cards) > 1 and 1 in box.cards and sum(box.cards) > 21 and box.addedten:
-            box.result = sum(box.cards) - 10
-            box.addedten = False
-        else:
-            box.result += box.cards[-1]
+        box_sum = sum(box.cards)
+        if 1 in box.cards and box_sum <= 11:
+            box_sum += 10  
 
-        x, y, width, height = box.coordinates
+        box.result = box_sum
 
-        card_spacing_x = 15 
-        card_spacing_y = 25 
-        card_x = x + 10 + (len(box.cards) - 1) * card_spacing_x
-        card_y = y + 20 + (len(box.cards) - 1) * card_spacing_y
-
-        pygame.draw.rect(self.screen, 'white', [card_x, card_y, 80, 110], 0, 5)
-        pygame.draw.rect(self.screen, 'red', [card_x, card_y, 80, 110], 3, 5)  # Card border
-        self.screen.blit(self.font.render(new_card.rank, True, "black"), (card_x + 10, card_y + 10))
-
-        self.draw_score(box)
+        self.draw_box_with_cards(box)
         pygame.display.flip()
-
-        return new_card.rank
 
     def deal_dealer_cards(self, index):
         new_card = self.logic.deck.draw_card()
@@ -447,8 +503,8 @@ class RenderGame:
 
         dealer_x, dealer_y = 640, 630
         pygame.draw.rect(self.screen, 'white', [dealer_x + (dealer_x * index), dealer_y  + (5 * index), 80, 110], 0, 5)
-        pygame.draw.rect(self.screen, 'blue', [dealer_x + (dealer_x * index), dealer_y  + (5 * index), 80, 110], 3, 5)   # Card background
-        self.screen.blit(self.font.render(new_card.rank, True, "black"), (dealer_x + 10, dealer_y + 10))  # Card rank
+        pygame.draw.rect(self.screen, 'blue', [dealer_x + (dealer_x * index), dealer_y  + (5 * index), 80, 110], 3, 5)   
+        self.screen.blit(self.font.render(new_card.rank, True, "black"), (dealer_x + 10, dealer_y + 10))  
 
         pygame.display.flip()
 
@@ -469,7 +525,7 @@ class RenderGame:
 
         return button
 
-    def draw_score(self, box, is_active=False, extra_box=False, tie=False, win=False, lose=False):
+    def draw_score(self, box, is_active=False, tie=False, win=False, lose=False):
         x, y, width, height = box.coordinates
 
         border_color = 'green' if is_active else 'darkblue'
@@ -477,30 +533,31 @@ class RenderGame:
 
         pygame.draw.rect(self.screen, 'skyblue', [x, y + height + 10, width, 30])
 
-        if box.blackjack:
-            self.screen.blit(self.font.render('BJ', True, self.BLACK), (x + 10, y + height + 15))
-        elif box.surrender:
-            self.screen.blit(self.font.render('SURRENDERED', True, self.BLACK), (x + 10, y + height + 15))
-        elif tie:
-            self.screen.blit(self.font.render('TIE', True, self.BLACK), (x + 10, y + height + 15))
-        elif win:
-            self.screen.blit(self.font.render('WIN', True, self.BLACK), (x + 10, y + height + 15))
-        elif win:
-            self.screen.blit(self.font.render('LOSE', True, self.BLACK), (x + 10, y + height + 15))
-        elif box.splitted and not extra_box:
-            self.screen.blit(self.font.render(f'Score[{box.result}]', True, self.BLACK), (x + 10, y + height + 15))
-        elif box.splitted and extra_box:
-            self.screen.blit(self.font.render(f'Score[{box.result}]', True, self.BLACK), (x + 10, y + height + 15))
-        elif box.busted:
-            self.screen.blit(self.font.render('BUSTED', True, self.RED), (x + 10, y + height + 15))
+        if box.splitted:
+            stack1_score = sum(box.cards[0])
+            stack2_score = sum(box.cards[1])
+
+            stack1_score += 10 if 1 in box.cards[0] and stack1_score <= 11 else 0
+            stack2_score += 10 if 1 in box.cards[1] and stack2_score <= 11 else 0
+
+            score_text_1 = "BUSTED" if stack1_score > 21 else f"Score[{stack1_score}]"
+            score_text_2 = "BUSTED" if stack2_score > 21 else f"Score[{stack2_score}]"
+
+            self.screen.blit(self.font.render(score_text_1, True, self.RED if stack1_score > 21 else self.BLACK), (x + 7, y + height + 15))
+            self.screen.blit(self.font.render(score_text_2, True, self.RED if stack2_score > 21 else self.BLACK), (x + 7 + width // 2, y + height + 15))
         else:
-            self.screen.blit(self.font.render(f'Score[{box.result}]', True, self.BLACK), (x + 10, y + height + 15))
-        
+            score_text = "BUSTED" if box.busted else f"Score[{box.result}]"
+            self.screen.blit(self.font.render(score_text, True, self.RED if box.busted else self.BLACK), (x + 10, y + height + 15))
+
         pygame.display.flip()
         
     def draw_dealer_score(self):
         pygame.draw.rect(self.screen, 'skyblue', [1000, 700, 200, 200])
-        self.screen.blit(self.font.render(f'Score[{self.logic.dealer.result}]', True, self.BLACK), (900, 700))
+
+        if self.logic.dealer.result > 21:
+            self.screen.blit(self.font.render('BUSTED', True, self.BLACK), (900, 700))
+        else:
+            self.screen.blit(self.font.render(f'Score[{self.logic.dealer.result}]', True, self.BLACK), (900, 700))
         pygame.display.flip()
 
     def draw_profit(self):
@@ -520,181 +577,57 @@ class RenderGame:
         pygame.draw.rect(self.screen, 'skyblue', [800, ])
 
     def split(self, box, card_rank):
-        extra_box_wager = self.take_player_wager(8, split_choice = True)
-        self.logic.player.balance -= int(extra_box_wager) 
-        
-        extra_box_wager_int = int(extra_box_wager)
-        extra_box_cards = box.cards[1]
-        box.cards.pop(1)
-        extra_box = Box(len((self.logic.player.boxes)) + 1, extra_box_wager_int, extra_box_cards)
-        extra_box.splitted = True
+        """Handles splitting of a box into two stacks."""
+        if self.logic.player.balance < box.wager:
+            self.screen.fill('skyblue')
+            self.draw_text("Not enough balance to split!", self.RED, (400, 300))
+            pygame.display.flip()
+            pygame.time.wait(2000)
+            return
+
+        self.logic.player.balance -= box.wager
         box.splitted = True
 
-        x, y, width, height = box.coordinates
-        pygame.draw.rect(self.screen, 'darkblue', box.coordinates, 0, 5)
+        first_card = box.cards.pop(0)
+        second_card = box.cards.pop(0)
+        box.cards = [[first_card], [second_card]]
 
-        card_spacing = 30
-        card_x = x + 5 + (len(box.cards) - 1) * card_spacing
-        card_y = y + 10  
+        for stack in box.cards:
+            new_card = self.logic.deck.draw_card()
+            stack.append(new_card.value)
 
-        print(card_rank)
+        self.draw_box_with_cards(box)
 
-        pygame.draw.rect(self.screen, 'white', [card_x, card_y, 80, 110], 0, 5)
-        pygame.draw.rect(self.screen, 'red', [card_x, card_y, 80, 110], 3, 5)
-        self.screen.blit(self.font.render(card_rank, True, "black"), (card_x + 10, card_y + 10))
+        for i in range(len(box.cards)):
+            stack_busted = False
+            while not stack_busted:
+                self.draw_box_with_cards(box)  
+                self.draw_score(box, is_active=True)  
 
-        pygame.display.flip()
+                decision = self.handle_decision_input(box, stack_index=i)
+                if decision == "STAY":
+                    break
+                elif decision == "HIT":
+                    self.deal_a_new_card_to_stack(box, stack_index=i)
+                    stack_sum = sum(box.cards[i])
+                    if 1 in box.cards[i] and stack_sum <= 11:
+                        stack_sum += 10  
+                    if stack_sum > 21:
+                        stack_busted = True
+                        self.draw_score(box) 
+                        break
+                elif decision == "DOUBLE":
+                    self.deal_a_new_card_to_stack(box, stack_index=i)
+                    box.wager *= 2
+                    break
+                elif decision == "SURRENDER":
+                    self.surrender(box)
+                    break
 
-        card_x = x + 35 + (len(box.cards) - 1) * card_spacing
-        card_y = y + 40  
+            self.draw_box_with_cards(box)
+            self.draw_score(box)
 
-        pygame.draw.rect(self.screen, 'white', [card_x, card_y, 80, 110], 0, 5)
-        pygame.draw.rect(self.screen, 'red', [card_x, card_y, 80, 110], 3, 5) 
-        self.screen.blit(self.font.render(card_rank, True, "black"), (card_x + 10, card_y + 10))
-
-        pygame.display.flip()
-
-        new_card = self.logic.deck.draw_card()
-        box.cards.append(new_card.value)
-
-        card_spacing = 30  
-        card_x = x + 5 + (len(box.cards) - 1) * card_spacing  
-        card_y = y + 10  
-
-        max_cards_in_row = (width - 20) // card_spacing 
-        if len(box.cards) > max_cards_in_row:
-            card_x = x + 5 + ((len(box.cards) - 1) % max_cards_in_row) * card_spacing
-            card_y = y + 10 + ((len(box.cards) - 1) // max_cards_in_row) * 50  
-
-        pygame.draw.rect(self.screen, 'white', [card_x, card_y, 80, 110], 0, 5)
-        pygame.draw.rect(self.screen, 'red', [card_x, card_y, 80, 110], 3, 5) 
-        self.screen.blit(self.font.render(new_card.rank, True, "black"), (card_x + 10, card_y + 10))
-
-        pygame.display.flip()
-
-        new_card = self.logic.deck.draw_card()
-        extra_box.cards.append(new_card.value)
-
-        card_spacing = 30  
-        card_x = x + 35 + (len(box.cards) - 1) * card_spacing  
-        card_y = y + 40  
-
-        max_cards_in_row = (width - 20) // card_spacing
-        if len(box.cards) > max_cards_in_row:
-            card_x = x + 35 + ((len(box.cards) - 1) % max_cards_in_row) * card_spacing
-            card_y = y + 40 + ((len(box.cards) - 1) // max_cards_in_row) * 50
-
-        pygame.draw.rect(self.screen, 'white', [card_x, card_y, 80, 110], 0, 5)
-        pygame.draw.rect(self.screen, 'red', [card_x, card_y, 80, 110], 3, 5) 
-        self.screen.blit(self.font.render(new_card.rank, True, "black"), (card_x + 10, card_y + 10))
-
-        pygame.display.flip()
-        boxes_list = [box, extra_box]
-        for single_box in boxes_list: 
-            single_box.result = sum(single_box.cards)
- 
-            if 1 in single_box and single_box.result <= 11 and not single_box.addedten:
-                single_box.result += 10
-                box.addedten = True
-                
-                if extra_box:
-                    self.draw_score(single_box, extra_box=True)
-                else:
-                    self.draw_score(single_box)
-
-                
-                if single_box.result < 21:
-                    run = True
-                    while run:
-                        self.hit_button
-                        self.stay
-                        self.surrender_button
-
-                        for event in pygame.event.get():
-                            if event.type == pygame.QUIT:
-                                run = False
-                            if event.type == pygame.MOUSEBUTTONUP:
-                                if self.hit_button.collidepoint(event.pos):
-                                    single_box.cards = self.hit(single_box.cards)
-                                    single_box.result = sum(single_box.cards)
-                                    
-                                    if single_box.result > 21 and not single_box.addedten:
-                                        self.screen.fill('skyblue')
-                                        self.draw_text("You are busted! You lose this game. You loose all the money you have wagered! Go and cry :D!", self.BLACK, (400, 250))
-                                        single_box.busted = True
-                                        if extra_box:
-                                            self.draw_score(single_box, extra_box=True)
-                                        else:
-                                            self.draw_score(single_box)
-                                        run = False
-                                    elif single_box.result > 21 and single_box.addedten:
-                                        single_box.result -= 10
-                                        single_box.addedten = False
-
-                                    if extra_box:
-                                        self.draw_score(single_box, extra_box=True)
-                                    else:
-                                        self.draw_score(single_box)
-                                elif self.stay.collidepoint(event.pos):
-                                    if extra_box:
-                                        self.draw_score(single_box, extra_box=True)
-                                    else:
-                                        self.draw_score(single_box)
-                                    run = False
-                                elif self.surrender_button.collidepoint(event.pos):
-                                    if extra_box:
-                                        self.draw_score(single_box, extra_box=True)
-                                    else:
-                                        self.draw_score(single_box)
-                                    single_box.surrender = True
-                                    run = False
-            elif 1 in single_box.cards and 10 in single_box.cards:
-                if extra_box:
-                    self.draw_score(single_box, extra_box=True)
-                else:
-                    self.draw_score(single_box)
-                break
-            elif single_box.result < 21: 
-                run = True
-                while run:
-                    self.hit_button
-                    self.stay
-                    self.surrender_button
-
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT:
-                            run = False
-                        if event.type == pygame.MOUSEBUTTONUP:
-                            if self.hit_button.collidepoint(event.pos):
-                                single_box.cards = self.hit(single_box.cards)
-                                single_box.result = sum(single_box.cards)
-                                if extra_box:
-                                    self.draw_score(single_box, extra_box=True)
-                                else:
-                                    self.draw_score(single_box)
-                                if single_box.result > 21:
-                                    self.screen.fill('skyblue')
-                                    self.draw_text("You are busted! You lose this game. You loose all the money you have wagered! Go and cry :D!", self.BLACK, (400, 250))
-                                    single_box.busted = True
-                                    run = False
-                            elif self.stay.collidepoint(event.pos):
-                                if extra_box:
-                                    self.draw_score(single_box, extra_box=True)
-                                else:
-                                    self.draw_score(single_box)
-                                run = False
-                            elif self.surrender_button.collidepoint(event.pos):
-                                if extra_box:
-                                    self.draw_score(single_box, extra_box=True)
-                                else:
-                                    self.draw_score(single_box)
-                                single_box.surrender = True
-                                run = False
-
-    def hit(self, box):
-        self.deal_a_new_card(box)
-        
-        return box.cards
+        self.draw_score(box, is_active=False)
 
     def surrender(self, box): 
         box.surrender = True 
@@ -742,51 +675,30 @@ class RenderGame:
         return False
 
     def handle_split(self, box, card_rank):
-        decision = self.handle_decision_input(split_box)
-        
-        if decision == "SPLIT":
-            self.split(box, card_rank)
-            
-            for split_box in [box, self.logic.player.boxes[-1]]:
-                while True:
-                    decision = self.handle_decision_input(split_box)
-                    
-                    if decision == "STAY":
-                        self.draw_score(split_box)
-                        break 
-                    
-                    elif decision == "HIT":
-                        self.deal_a_new_card(split_box)
-                        split_box.result = sum(split_box.cards)
+        self.split(box, card_rank)  
 
-                        if 1 in split_box.cards and split_box.result <= 11 and not split_box.addedten:
-                            split_box.result += 10
-                            split_box.addedten = True
-
-                        self.draw_score(split_box)
-
-                        if split_box.result > 21:
-                            if split_box.addedten:
-                                split_box.result -= 10
-                                split_box.addedten = False
-                                self.draw_score(split_box)
-                            else:
-                                split_box.busted = True
-                                self.draw_score(split_box)
-                                break
-                    
-                    elif decision == "SURRENDER":
-                        split_box.surrender = True
-                        split_box.profit = split_box.wager / 2
-                        self.draw_score(split_box)
-                        break
-
-                    elif decision == "DOUBLE":
-                        self.double_down(split_box)
+        for i in range(len(box.cards)): 
+            while True:
+                self.draw_score(box, is_active=True) 
+                decision = self.handle_decision_input(box)
+                if decision == "STAY":
+                    break  
+                elif decision == "HIT":
+                    self.deal_a_new_card_to_stack(box, stack_index=i)
+                    stack_sum = sum(box.cards[i])
+                    if 1 in box.cards[i] and stack_sum <= 11:
+                        stack_sum += 10  
+                    if stack_sum > 21:
+                        self.draw_score(box, is_active=True) 
                         break  
-                return True
-        else:
-            return False
+                elif decision == "DOUBLE":
+                    self.deal_a_new_card_to_stack(box, stack_index=i)
+                    box.wager *= 2  
+                    break
+                elif decision == "SURRENDER":
+                    self.surrender(box)
+                    break
+        self.draw_score(box, is_active=False) 
 
     def handle_busted(self, box):
         if box.result > 21 and not box.addedten: 
@@ -930,19 +842,13 @@ class RenderGame:
                 dealmorecards = True
 
         if dealmorecards:
-            for i, card_value in enumerate(self.logic.dealer.cards):
-                card_x = dealer_x + i * card_offset
-                pygame.draw.rect(self.screen, 'white', [card_x, dealer_y, 80, 110], 0, 5)
-                pygame.draw.rect(self.screen, 'blue', [card_x, dealer_y, 80, 110], 3, 5)  
-                self.screen.blit(self.font.render(str(card_value), True, "black"), (card_x + 10, dealer_y + 10))
-
             new_card = self.logic.deck.draw_card()
             self.logic.dealer.cards.append(new_card.value)
             self.logic.dealer.result = sum(self.logic.dealer.cards)
 
             card_x = dealer_x + len(self.logic.dealer.cards) * card_offset
             pygame.draw.rect(self.screen, 'white', [card_x, dealer_y, 80, 110], 0, 5)
-            pygame.draw.rect(self.screen, 'blue', [card_x, dealer_y, 80, 110], 3, 5)  # Card border
+            pygame.draw.rect(self.screen, 'blue', [card_x, dealer_y, 80, 110], 3, 5)  
             self.screen.blit(self.font.render(new_card.rank, True, "black"), (card_x + 10, dealer_y + 10))
             pygame.display.flip()
 
@@ -963,7 +869,7 @@ class RenderGame:
                     
                     card_x = dealer_x + len(self.logic.dealer.cards) * card_offset
                     pygame.draw.rect(self.screen, 'white', [card_x, dealer_y, 80, 110], 0, 5)
-                    pygame.draw.rect(self.screen, 'blue', [card_x, dealer_y, 80, 110], 3, 5)  # Card border
+                    pygame.draw.rect(self.screen, 'blue', [card_x, dealer_y, 80, 110], 3, 5) 
                     self.screen.blit(self.font.render(new_card.rank, True, "black"), (card_x + 10, dealer_y + 10))
                     pygame.display.flip()
 
@@ -1016,7 +922,6 @@ class RenderGame:
         for box in self.logic.player.boxes:
             new_card_rank = self.deal_a_new_card(box)
 
-
             if 1 in box.cards and 10 in box.cards:
                 box.blackjack = True 
                 box.profit = box.wager * 3
@@ -1029,12 +934,24 @@ class RenderGame:
 
             self.draw_score(box, is_active=True)
 
-            if len(box.cards) == 2 and box.cards[0] == box.cards[1] and self.logic.player.balance >= 10:
-                self.handle_split(box, new_card_rank)
-            elif self.handle_double_down(box):
-                pass
-            elif self.handle_hit_stay_surrender(box):
-                pass
+            while True:
+                decision = self.handle_decision_input(box)
+                if decision == "STAY":
+                    break
+                elif decision == "HIT":
+                    self.deal_a_new_card(box)
+                    if box.result >= 21:
+                        box.busted = True
+                        break
+                elif decision == "SPLIT":
+                    self.split(box, box.cards[0])
+                    break
+                elif decision == "DOUBLE":
+                    self.double_down(box)
+                    break
+                elif decision == "SURRENDER":
+                    self.surrender(box)
+                    break
 
             self.draw_score(box, is_active=False)
                   
